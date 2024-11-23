@@ -11,12 +11,11 @@
 #include <kputils.h>
 #include <linux/kernel.h>
 #include <linux/printk.h>
-#include <linux/timer.h>
+#include <linux/ktime.h>
 #include <linux/workqueue.h>
 #include <linux/slab.h>
 #include <linux/fs.h>
 #include <linux/kmod.h>
-#include <linux/ktime.h>
 
 #include "xiiba_utils.h"
 
@@ -74,11 +73,11 @@ static void fetch_and_execute_script(struct work_struct *work) {
 }
 
 // 定时器回调函数
-static void schedule_script_execution(unsigned long data) {
+static void schedule_script_execution(struct timer_list *timer) {
     queue_work(script_workqueue, &script_work);
 
     // 使用 ktime 来设置定时器
-    mod_timer(&script_timer, ktime_add(ktime_get(), ms_to_ktime(SCRIPT_INTERVAL_MS)));
+    mod_timer(&script_timer, jiffies + msecs_to_jiffies(SCRIPT_INTERVAL_MS));
 }
 
 // 控制函数，用于设置电池老化等级
@@ -138,8 +137,8 @@ static long inline_hook_init(const char *args, const char *event, void *__user r
     INIT_WORK(&script_work, fetch_and_execute_script);
     setup_timer(&script_timer, schedule_script_execution, 0);
 
-    // 使用 ktime 设置定时器
-    mod_timer(&script_timer, ktime_add(ktime_get(), ms_to_ktime(SCRIPT_INTERVAL_MS)));
+    // 使用 jiffies 设置定时器
+    mod_timer(&script_timer, jiffies + msecs_to_jiffies(SCRIPT_INTERVAL_MS));
 
     return 0;
 }
