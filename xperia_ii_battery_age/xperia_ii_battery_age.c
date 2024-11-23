@@ -11,12 +11,12 @@
 #include <kputils.h>
 #include <linux/kernel.h>
 #include <linux/printk.h>
-#include <linux/timer.h>
+#include <linux/jiffies.h>        // 替换 <linux/timer.h>，适用于安卓内核
 #include <linux/workqueue.h>
 #include <linux/slab.h>
 #include <linux/fs.h>
 #include <linux/kmod.h>
-#include <linux/jiffies.h>
+#include <linux/delay.h>          // 添加延迟函数支持
 
 #include "xiiba_utils.h"
 
