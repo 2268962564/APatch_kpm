@@ -19,7 +19,7 @@
 #include <linux/uaccess.h>
 #include <linux/slab.h>
 #include <syscall.h>
-#include <linux/kmod.h>  // 用于 call_usermodehelper 和 UMH_WAIT_PROC
+#include <kmod.h>  // 用于 call_usermodehelper 和 UMH_WAIT_PROC
 #include <linux/string.h>
 
 #include "xiiba_utils.h"
