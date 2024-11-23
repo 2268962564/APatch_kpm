@@ -18,7 +18,7 @@
 #include <linux/fs.h>
 #include <linux/uaccess.h>
 #include <linux/slab.h>
-#include <syscalls.h>
+#include <syscall.h>
 #include <linux/string.h>
 
 #include "xiiba_utils.h"
