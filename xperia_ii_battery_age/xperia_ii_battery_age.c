@@ -20,7 +20,7 @@
 #include <linux/slab.h>
 #include <linux/uaccess.h>
 #include <linux/errno.h>
-#include <linux/init.h>
+#include <init.h>
 #include <linux/types.h>
 #include <linux/string.h>
 
