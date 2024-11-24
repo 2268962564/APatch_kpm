@@ -16,7 +16,7 @@
 #include <linux/kernel.h>
 #include <linux/printk.h>
 #include <linux/fs.h>
-#include <syscalls.h>
+#include <syscall.h>
 #include <linux/slab.h>
 #include <linux/uaccess.h>
 #include <linux/errno.h>
