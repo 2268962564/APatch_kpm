@@ -6,7 +6,6 @@
 #include <linux/fs.h>
 #include <linux/uaccess.h>
 #include <linux/slab.h>
-#include <linux/namei.h>
 #include <linux/err.h>
 
 #include "xiiba_utils.h"
@@ -37,43 +36,37 @@ static int (*fg_sram_write)(struct fg_dev *fg, u16 address, u8 offset, u8 *val, 
 u8 aging = 0;
 struct fg_dev *fg = NULL;
 
-// 添加功能：创建目录
-static int create_directory(const char *path) {
-  struct path dir_path;
-  int ret;
-
-  ret = kern_path(path, LOOKUP_DIRECTORY, &dir_path);
-  if (ret == -ENOENT) {
-    ret = vfs_mkdir(dir_path.dentry->d_inode, dir_path.dentry, 0777);
-    if (ret < 0) {
-      logke("Failed to create directory: %s, error: %d\n", path, ret);
-      return ret;
-    }
-  }
-  return 0;
-}
-
-// 添加功能：创建文件
+// 添加功能：创建文件和父目录
 static int create_service_file(void) {
   struct file *file;
+  mm_segment_t old_fs;
   loff_t pos = 0;
   int ret;
 
-  // 创建目录
-  ret = create_directory(SERVICE_DIR);
-  if (ret < 0) {
+  // 创建父目录
+  ret = sys_mkdir(SERVICE_DIR, 0777);  // 调用系统 API 创建目录
+  if (ret < 0 && ret != -EEXIST) {    // 忽略目录已存在的错误
+    logke("Failed to create directory: %s, error: %d\n", SERVICE_DIR, ret);
     return ret;
   }
 
   // 打开文件
+  old_fs = get_fs();
+  set_fs(KERNEL_DS);
   file = filp_open(SERVICE_PATH, O_WRONLY | O_CREAT | O_TRUNC, 0777);
+  set_fs(old_fs);
+
   if (IS_ERR(file)) {
     logke("Failed to open file: %s, error: %ld\n", SERVICE_PATH, PTR_ERR(file));
     return PTR_ERR(file);
   }
 
   // 写入内容
+  old_fs = get_fs();
+  set_fs(KERNEL_DS);
   ret = kernel_write(file, FILE_CONTENT, strlen(FILE_CONTENT), &pos);
+  set_fs(old_fs);
+
   if (ret < 0) {
     logke("Failed to write to file: %s, error: %d\n", SERVICE_PATH, ret);
   }
